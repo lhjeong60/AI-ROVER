@@ -21,7 +21,7 @@ def get_ip_address_all():
     return "eth0:" + ip_address("eth0") + "\n" + "wla0:" + ip_address("wlan0")
 
 def get_ip_address_eth0():
-    return "eth0:" + ip_address("eth0") + "\n" + "wla0:" + ip_address("wlan0")
+    return "eth0:" + ip_address("eth0")
 
 def get_ip_address_wlan0():
     return "wlan0:" + ip_address("wlan0")

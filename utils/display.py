@@ -13,9 +13,6 @@ class Oled(object):
         self.image = PIL.Image.new('1', (self.display.width, self.display.height))
         self.draw = PIL.ImageDraw.Draw(self.image)
         self.draw.rectangle((0, 0, self.image.width, self.image.height), outline=0, fill=0)
-        self.stats_enabled = False
-        self.stats_thread = None
-        self.stats_interval = 1.0
 
     # 디스플레이에 텍스트 입력
     def set_text(self, text):
