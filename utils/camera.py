@@ -14,9 +14,9 @@ class Camera:
         self.__dp_h = dp_h
         self.__fps = fps
         self.__flip_method = flip_method
-        self.__videoCapture = cv2.VideoCapture(self.__gstreamer_pipline(), cv2.CAP_GSTREAMER)
+        self.__videoCapture = None
 
-    def __gstreamer_pipline(self):
+    def __gstreamer_pipline(self, cap_w, cap_h, fps, flip_method, dp_w, dp_h):
         return (
                 "nvarguscamerasrc ! "
                 "video/x-raw(memory:NVMM), "
@@ -27,14 +27,25 @@ class Camera:
                 "videoconvert ! "
                 "video/x-raw, format=(string)BGR ! appsink"
                 % (
-                    self.__cap_w,
-                    self.__cap_h,
-                    self.__fps,
-                    self.__flip_method,
-                    self.__dp_w,
-                    self.__dp_h,
+                    cap_w,
+                    cap_h,
+                    fps,
+                    flip_method,
+                    dp_w,
+                    dp_h,
                 )
         )
+
+    def camera_init(self):
+        print("camera_init_start")
+        self.__videoCapture = cv2.VideoCapture(self.__gstreamer_pipline(
+            self.__cap_w,
+            self.__cap_h,
+            self.__fps,
+            self.__flip_method,
+            self.__dp_w,
+            self.__dp_h), cv2.CAP_GSTREAMER)
+        print("camera_init_end")
 
     def show_camera(self):
         if self.__videoCapture.isOpened():
@@ -53,6 +64,9 @@ class Camera:
         else:
             print("Unable to open camera")
 
+    def isOpened(self):
+        return self.__videoCapture.isOpened()
+
     def read(self):
         retval, frame = self.__videoCapture.read()
         return retval, frame
@@ -65,4 +79,12 @@ class Camera:
 
 if __name__ == "__main__":
     camera = Camera()
-    camera.show_camera()
+    camera.camera_init()
+    retval, frame = camera.read()
+    print(frame.shape)
+    print(frame)
+    cv2.imshow("a", frame)
+    while True:
+        key = cv2.waitKey(1)
+        if key == 27:
+            break

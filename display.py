@@ -5,6 +5,7 @@ import PIL.Image
 import PIL.ImageFont
 import PIL.ImageDraw
 import os
+import socket
 
 
 class DisplayServer(object):
@@ -77,5 +78,10 @@ class DisplayServer(object):
 
 
 if __name__ == '__main__':
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("192.168.3.1", 0))
+    ipAddress = s.getsockname()[0]
+    s.close()
+
     server = DisplayServer()
-    server.set_text("print display\ntest")
+    server.set_text("IP : " + ipAddress)
