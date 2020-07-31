@@ -231,5 +231,6 @@ def get_power_status():
 if __name__=='__main__':
     oled = display.Oled()
     while True:
-        oled.set_text(get_power_status())
+        #oled.set_text(get_power_status())
+        print(get_power_status())
         time.sleep(2)
