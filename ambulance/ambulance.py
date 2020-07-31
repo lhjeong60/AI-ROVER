@@ -31,6 +31,10 @@ class Ambulance:
             self.__oled.set_text(ip.get_ip_address_wlan0() + "\n" + pw.get_power_status())
             time.sleep(2)
 
+    def get_voltage_percentage(self):
+        voltage_percentage = round((pw.get_voltage() - 11.1) / 0.015)
+        return voltage_percentage
+
     # def cam_read(self):
     #     retval, frame = self.__camera.read()
     #     return retval, frame

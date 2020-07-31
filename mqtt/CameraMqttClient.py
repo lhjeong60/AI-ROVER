@@ -88,7 +88,7 @@ class ImageMqttPublisher:
                 self.ambulance.set_angle(angle)
 
                 self.sendBase64(frame)
-                # print("send")
+                print("send")
             else:
                 print("videoCapture is not opened")
                 break
