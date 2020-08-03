@@ -3,66 +3,6 @@ import numpy as np
 import os
 import sys
 
-
-# current_path = os.path.dirname(os.path.abspath(__file__))
-# sys.path.append(current_path)
-
-# #%% 이미지 로딩
-# img = cv2.imread("C:/Temp/a.png")
-# #img = cv2.imread("C:/Temp/slope_test.jpg")
-# img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-# plt.imshow(img_gray, cmap="gray")
-# plt.show()
-#
-# #%% Gaussian blur (노이즈 제거)
-# blur_gray = cv2.GaussianBlur(img_gray, (5, 5), 0)
-# plt.imshow(blur_gray, cmap="gray")
-# plt.show()
-#
-# #%% threshold (이진화)
-# th, img_th = cv2.threshold(blur_gray, 127, 255, cv2.THRESH_BINARY)
-# plt.imshow(img_th, cmap="gray")
-# plt.show()
-#
-# #%% close 모폴로지
-# kernel = np.ones((5, 5), np.uint8)
-# img_morph = cv2.morphologyEx(img_th.astype(np.uint8), cv2.MORPH_CLOSE, kernel)
-# plt.imshow(img_morph, cmap="gray")
-# plt.show()
-#
-# #%% Canny detection
-# edges = cv2.Canny(img_morph, 50, 200)
-# plt.imshow(edges, cmap="gray")
-# plt.show()
-#
-# #%% ROI
-# mask = np.zeros_like(img_gray)
-# ignore_mask_color = 255
-# imshape = img_gray.shape
-#
-# vertices = np.array([[(130, imshape[0]),
-#                       (320, 250),
-#                       (420, 250),
-#                       (imshape[1]-20, imshape[0])]], dtype=np.int32)
-# cv2.fillPoly(mask, vertices, ignore_mask_color)
-#
-# plt.imshow(mask, cmap="gray")
-# plt.show()
-#
-# #%% 관심영역만 표시
-# masked_img = cv2.bitwise_and(edges, mask)
-# plt.imshow(masked_img, cmap="gray")
-# plt.show()
-#
-# #%% bird's eye view
-# position1 = np.float32([[300, 250], [0, imshape[0]], [420, 250], [imshape[1], imshape[0]]])
-# position2 = np.float32([[10, 10], [10, 1000], [1000, 10], [1000, 1000]])
-# M = cv2.getPerspectiveTransform(position1, position2)
-# dst = cv2.warpPerspective(img, M, (1100, 1100))
-#
-# plt.imshow(dst, cmap="gray")
-# plt.show()
-
 # %%
 def get_fitline(img, f_lines):  # 대표선 구하기
     if f_lines.shape[1] == 1:
@@ -172,7 +112,8 @@ def line_detect(frame):
     mask = np.zeros_like(img_gray)
     ignore_mask_color = 255
     height, width = img_gray.shape
-    vertices = np.array([[(0, height), (0, height / 3), (width, height / 3),
+    # 320(w) x 240(h)일 때의 ROI/ 테스트 완료
+    vertices = np.array([[(0, height), (40, height / 2), (width-40, height / 2),
                           (width, height)]], dtype=np.int32)
     cv2.fillPoly(mask, vertices, ignore_mask_color)
     masked_img = cv2.bitwise_and(edges, mask)
@@ -183,7 +124,8 @@ def line_detect(frame):
     lines = cv2.HoughLinesP(masked_img, 1, np.pi / 180, 30, minLineLength=10, maxLineGap=20)
 
     if lines is None:
-        return None
+        line_retval = False
+        return line_retval, None, None
 
     if lines.shape[0] == 1:
         line_arr = lines[0, :, :]
@@ -202,9 +144,10 @@ def line_detect(frame):
     slope_degree = slope_degree[np.abs(slope_degree) > 95]
 
     # 필터링된 직선 버리기
-    # L_lines, R_lines = line_arr[(slope_degree > 0), :], line_arr[(slope_degree < 0), :]
+    L_lines, R_lines = line_arr[(slope_degree > 0), :], line_arr[(slope_degree < 0), :]
 
-    return line_arr  # L_lines, R_lines  # lines
+    line_retval = True
+    return line_retval, L_lines, R_lines
 
 
 # %% test

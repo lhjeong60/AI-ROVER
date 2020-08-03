@@ -1,7 +1,9 @@
 import cv2
+from datetime import datetime
 import paho.mqtt.client as mqtt
 import threading
 import base64
+from collections import deque
 
 import numpy as np
 import os
@@ -11,7 +13,8 @@ current_path = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(current_path)
 
 from utils.camera import Camera
-import line_detect.main_test as line
+import line_detect.line_detect as line
+import utils.pid_controller as pid
 
 class ImageMqttPublisher:
     def __init__(self, brokerIp=None, brokerPort=1883, pubTopic=None, ambulance=None):
@@ -34,6 +37,12 @@ class ImageMqttPublisher:
 
     def __run(self):
         self.client.connect(self.brokerIp, self.brokerPort)
+
+        road_half_width_list = deque(maxlen=10)
+        road_half_width_list.append(165)
+        pid_controller = pid.PIDController(round(datetime.utcnow().timestamp() * 1000))
+        pid_controller.set_gain(0.63, -0.001, 0.23)
+
         self.client.loop_start()
         while True:
             if self.camera.isOpened():
@@ -42,38 +51,111 @@ class ImageMqttPublisher:
                     print("video capture fail")
                     break
                 h, w, _ = frame.shape
-                lines = line.line_detect(frame)
+                line_retval, L_lines, R_lines = line.line_detect(frame)
 
                 # =========================선을 찾지 못했다면, 다음 프레임으로 continue=========================
-                if lines is None:
+                if line_retval == False:
                     self.sendBase64(frame)
                     continue
 
                 # ===================================================================================
                 # 고정 y 값
                 y_fix = int(h * (2 / 3))
-                # 교점들을 저장할 리스트
-                cross_points = []
-                
-                for each_line in lines:
-                    x1, y1, x2, y2 = each_line
-                    cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), thickness=2)
-                    
-                    # 직선의 기울기
-                    slope = (y2 - y1) / (x2 - x1)
-                    # 교점의 x 좌표
-                    cross_x = ((y_fix - y1) / slope) + x1
 
-                    cross_points.append(cross_x)
-
-                left_line_x = min(cross_points)
-                right_line_x = max(cross_points)
-                center_x = int(w/2)
-                road_center_x = left_line_x + (right_line_x - left_line_x) / 2
-                road_center_point = (int(road_center_x), y_fix)
+                # 화면 중앙 점
+                center_x = int(w / 2)
                 center_point = (center_x, y_fix)
+
+                # 교점들을 저장할 리스트
+                left_cross_points = []
+                right_cross_points = []
+
+                # 왼/오 선을 찾았는지 bool 변수에 저장
+                L_lines_detected = bool(len(L_lines) != 0)
+                R_lines_detected = bool(len(R_lines) != 0)
+
+                # 둘다 찾았을 경우
+                if L_lines_detected and R_lines_detected:
+                    for each_line in L_lines:
+                        x1, y1, x2, y2 = each_line
+                        # 직선 그리기
+                        cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                        # 직선의 기울기
+                        slope = (y2 - y1) / (x2 - x1)
+                        # 교점의 x 좌표
+                        cross_x = ((y_fix - y1) / slope) + x1
+                        
+                        # 교점의 x 좌표 저장
+                        left_cross_points.append(cross_x)
+
+                    for each_line in R_lines:
+                        x1, y1, x2, y2 = each_line
+                        # 직선 그리기
+                        cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                        # 직선의 기울기
+                        slope = (y2 - y1) / (x2 - x1)
+                        # 교점의 x 좌표
+                        cross_x = ((y_fix - y1) / slope) + x1
+
+                        # 교점의 x 좌표 저장
+                        right_cross_points.append(cross_x)
+                    
+                    # 모든 선들의 가장 작은 x 좌표가 왼쪽, 큰 x 좌표가 오른쪽
+                    left_line_x = min(left_cross_points)
+                    right_line_x = max(right_cross_points)
+                    
+                    # 도로 너비의 반 계산 후 저장
+                    road_half_width = (right_line_x - left_line_x) / 2
+                    road_half_width_list.append(road_half_width)
+                    
+                    # 도로 중간 지점 저장
+                    road_center_x = left_line_x + road_half_width
+                    road_center_point = (int(road_center_x), y_fix)
+
+                # 둘중 하나만 찾았을 경우
+                elif L_lines_detected ^ R_lines_detected:
+                    road_half_width = np.mean(road_half_width_list)
+
+                    # 왼쪽 선만 찾았을 경우
+                    if L_lines_detected:
+                        for each_line in L_lines:
+                            x1, y1, x2, y2 = each_line
+                            # 직선 그리기
+                            cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                            # 직선의 기울기
+                            slope = (y2 - y1) / (x2 - x1)
+                            # 교점의 x 좌표
+                            cross_x = ((y_fix - y1) / slope) + x1
+
+                            # 교점의 x 좌표 저장
+                            left_cross_points.append(cross_x)
+                        
+                        # 왼쪽선들만 찾았으니, 그중 가장 작은 x 좌표가 왼쪽 선
+                        left_line_x = min(left_cross_points)
+                        # 도로 중간 지점 저장
+                        road_center_x = left_line_x + road_half_width
+                        road_center_point = (int(road_center_x), y_fix)
+
+                    # 오른쪽 선만 찾았을 경우
+                    else:
+                        for each_line in R_lines:
+                            x1, y1, x2, y2 = each_line
+                            cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                            # 직선의 기울기
+                            slope = (y2 - y1) / (x2 - x1)
+                            # 교점의 x 좌표
+                            cross_x = ((y_fix - y1) / slope) + x1
+
+                            # 교점의 x 좌표 저장
+                            right_cross_points.append(cross_x)
+
+                        # 오른쪽선들만 찾았으니, 그중 가장 큰 x 좌표가 오른쪽 선
+                        right_line_x = max(right_cross_points)
+                        # 도로 중간 지점 저장
+                        road_center_x = right_line_x - road_half_width
+                        road_center_point = (int(road_center_x), y_fix)
                 
-                # 포인트와 라인 시각화
+                # 도로 중간 지점 / 자동차 중간 지점과 라인 시각화
                 cv2.circle(frame, road_center_point, 5, (255, 0, 0), -1)
                 cv2.circle(frame, center_point, 5, (0, 255, 0), -1)
                 cv2.line(frame, road_center_point, center_point, (255, 255, 255), 2)
@@ -85,10 +167,16 @@ class ImageMqttPublisher:
                 # 각도 구하기
                 # 오른쪽으로 회전해야 하는 경우 각도가 음수, 왼쪽으로 회전해야하는 경우 양수
                 angle = np.arctan2(offset_height, offset_width) * 180 / (np.pi) - 90
+                # print("before : {}".format(angle))
+
+                angle = pid_controller.equation(angle)
+                # print("after : {}".format(angle))
+
+                # 핸들 제어
                 self.ambulance.set_angle(angle)
 
                 self.sendBase64(frame)
-                print("send")
+                # print("send")
             else:
                 print("videoCapture is not opened")
                 break
