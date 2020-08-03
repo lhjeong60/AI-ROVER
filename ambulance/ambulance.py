@@ -72,18 +72,18 @@ class Ambulance:
         #     self.__dcMotor_speed += 0.01
         # self.__motor_control.throttle_gain = self.__dcMotor_speed
         # print("forward")
-        self.__motor_control.throttle = 0
+        # self.__motor_control.throttle = 0
+        self.__motor_control.throttle_gain = 0.55
         self.__motor_control.throttle = 1
-        self.__motor_control.throttle_gain = 0.7
 
     def forward(self):
         # if self.__dcMotor_speed < 1.0:
         #     self.__dcMotor_speed += 0.01
         # self.__motor_control.throttle_gain = self.__dcMotor_speed
         # print("backward")
-        self.__motor_control.throttle = 0
+        # self.__motor_control.throttle = 0
+        self.__motor_control.throttle_gain = 0.55
         self.__motor_control.throttle = -1
-        self.__motor_control.throttle_gain = 0.7
 
     def stop(self):
         # print("stop")
