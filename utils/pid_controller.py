@@ -1,8 +1,8 @@
-import time
 from datetime import datetime
 import queue
 
-class PIDController():
+
+class PIDController:
     def __init__(self, last_time):
         self.__p_gain = 0
         self.__i_gain = 0
@@ -14,7 +14,7 @@ class PIDController():
         self.__pre_error_theta = 0
         self.__sum_queue = queue.Queue()
 
-    def set_gain(self,p_gain, i_gain, d_gain):
+    def set_gain(self, p_gain, i_gain, d_gain):
         self.__p_gain = p_gain
         self.__i_gain = i_gain
         self.__d_gain = d_gain

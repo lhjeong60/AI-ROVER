@@ -1,5 +1,5 @@
 import subprocess
-import display
+import utils.display as display
 
 def network_interface_state(interface):
     try:

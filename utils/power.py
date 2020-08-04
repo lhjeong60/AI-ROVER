@@ -1,7 +1,7 @@
 import smbus
 import time
 import subprocess
-import display
+import utils.display as display
 
 # Config Register (R/W)
 _REG_CONFIG                 = 0x00

@@ -6,6 +6,18 @@ import ctypes
 import tensorrt as trt
 import random
 import colorsys
+import os
+import sys
+import paho.mqtt.client as mqtt
+import base64
+from datetime import datetime
+from collections import deque
+
+current_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(current_path)
+
+import line_detect.line_detect as line_detect
+import utils.pid_controller as pid
 
 # -------------------------------------------------------------------------------------
 # CUDA 드라이버를 초기화하고 입력 이미지를 얻어 TrtSSD 클래스에게 감지를 위임하는 스레드 클래스
@@ -17,7 +29,7 @@ class TrtThread(threading.Thread):
     INPUT_TYPE_USBCAM = 2
 
     # 생성자 선언
-    def __init__(self, enginePath, inputType, inputSource, conf_th, condition):
+    def __init__(self, enginePath, inputType, inputSource, conf_th, condition, ambulance):
         threading.Thread.__init__(self)
         self.enginePath = enginePath
         self.inputSource = inputSource
@@ -33,6 +45,8 @@ class TrtThread(threading.Thread):
         self.clss = None
         self.running = True
 
+        self.ambulance = ambulance
+
     # start() 메소드가 호출되면 실행
     def run(self):
         # CUDA 드라이버 초기화
@@ -41,6 +55,13 @@ class TrtThread(threading.Thread):
         self.cuda_ctx = cuda.Device(0).make_context()
         # 사물 감지를 수행하는 TrtSSD 생성
         self.trt_ssd = TrtSSD(self.enginePath)
+
+        road_half_width_list = deque(maxlen=10)
+        road_half_width_list.append(165)
+
+        pid_controller = pid.PIDController(round(datetime.utcnow().timestamp() * 1000))
+        pid_controller.set_gain(0.63, -0.001, 0.23)
+
         # 입력 소스별로 이미지를 읽고 TrTSSD에게 감지 요청
         while self.running:
             # 입력 소스가 이미지일 경우
@@ -58,8 +79,22 @@ class TrtThread(threading.Thread):
             elif self.inputType == TrtThread.INPUT_TYPE_VIDEO or self.inputType == TrtThread.INPUT_TYPE_USBCAM:
                 videoCapture = self.inputSource
                 retval, img = videoCapture.read()
+
                 if retval is True:
                     boxes, confs, clss = self.trt_ssd.detect(img, self.conf_th)
+                    line_retval, L_lines, R_lines = line_detect.line_detect(img)
+
+                    if line_retval == False:
+                        with self.condition:
+                            self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
+                            self.condition.notify()
+                        continue
+
+                    angle = line_detect.offset_detect(img, L_lines, R_lines, road_half_width_list)
+                    angle = pid_controller.equation(angle)
+
+                    self.ambulance.set_angle(angle)
+
                     with self.condition:
                         self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
                         self.condition.notify()
@@ -89,7 +124,7 @@ class TrtSSD(object):
         # 엔진 파일 경로 필드 선언 및 초기화
         self.enginePath = enginePath
         # 라이브러리 로딩
-        ctypes.CDLL("../lib/libflattenconcat.so")
+        ctypes.CDLL("/home/jetson/MyWorkspace/Ambulance/detection/lib/libflattenconcat.so")
         # 로거 필드 선언 및 초기화
         self.trtLogger = trt.Logger(trt.Logger.INFO)
         # TensorRT 로거 세팅
