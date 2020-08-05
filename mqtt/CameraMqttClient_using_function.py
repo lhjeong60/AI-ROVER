@@ -66,9 +66,6 @@ class ImageMqttPublisher:
 
                 # 핸들 제어
                 self.ambulance.set_angle(angle)
-
-
-
                 self.sendBase64(frame)
                 # print("send")
             else:

@@ -2,6 +2,8 @@ import time
 import os
 import sys
 import threading
+from collections import deque
+from datetime import datetime
 
 from jetracer.nvidia_racecar import NvidiaRacecar
 
@@ -12,10 +14,16 @@ from utils.camera import Camera
 import utils.ipaddress as ip
 import utils.power as pw
 from utils.display import Oled
-
+import line_detect.line_detect as line_detect
+from utils.pid_controller import PIDController
 
 class Ambulance:
+    AUTO_MODE = 1
+    MANUAL_MODE = 2
+
+
     def __init__(self):
+        # 모터 제어
         self.__motor_control = NvidiaRacecar()
 
         # Oled 표시, 스레딩
@@ -26,6 +34,19 @@ class Ambulance:
         self.__handle_angle = 0
         self.__dcMotor_speed = 0
 
+        # =================pid controller======================
+        self.pid_controller = PIDController(round(datetime.utcnow().timestamp() * 1000))
+        self.pid_controller.set_gain(0.63, -0.001, 0.23)
+
+        # ==================line detect variable===============
+        self.road_half_width_list = deque(maxlen=10)
+        self.road_half_width_list.append(165)
+
+        self.L_lines = []
+        self.R_lines = []
+
+        # =================mode 1:auto 2:manual================
+        self.mode = 0
     def __oled_setting(self):
         while True:
             self.__oled.set_text(ip.get_ip_address_wlan0() + "\n" + pw.get_power_status())
@@ -39,7 +60,7 @@ class Ambulance:
     #     retval, frame = self.__camera.read()
     #     return retval, frame
 
-    # ==========================================================================
+    # ============================핸들 원격 제어==============================
     def handle_right(self):
         if self.__handle_angle >= -1:
             self.__handle_angle -= 0.1
@@ -67,6 +88,8 @@ class Ambulance:
             # print(self.__handle_angle)
             self.__motor_control.steering = self.__handle_angle
 
+    # =============================속도 원격 제어=============================
+
     def backward(self):
         # if self.__dcMotor_speed < 1.0:
         #     self.__dcMotor_speed += 0.01
@@ -90,7 +113,7 @@ class Ambulance:
         self.__dcMotor_speed = 0
         self.__motor_control.throttle_gain = self.__dcMotor_speed
         self.__motor_control.throttle = self.__dcMotor_speed
-    # =========================================================================
+    # ===========================핸들 각도 제어(자율 주행)==========================
 
     def set_angle(self, angle):
         if angle > 30:
@@ -100,3 +123,24 @@ class Ambulance:
         steering = angle / 30
         self.__motor_control.steering = steering
 
+    # ===========================자율 주행 =====================================
+    def set_mode(self, mode):
+        self.mode = mode
+
+    def auto_drive(self, frame, flag):
+        if flag == 0:
+            line_retval, self.L_lines, self.R_lines = line_detect.line_detect(frame)
+
+            if line_retval == False:
+                return -1
+            else:
+                return 1
+
+        if flag == 1:
+            angle = line_detect.offset_detect(frame, self.L_lines, self.R_lines, self.road_half_width_list)
+            if self.mode == self.AUTO_MODE:
+                self.forward()
+                angle = self.pid_controller.equation(angle)
+                self.set_angle(angle)
+
+            return 2

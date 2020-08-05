@@ -30,7 +30,7 @@ class TrtThread(threading.Thread):
 
     # 생성자 선언
     def __init__(self, enginePath, inputType, inputSource, conf_th, condition, ambulance):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, daemon=True)
         self.enginePath = enginePath
         self.inputSource = inputSource
         self.inputType = inputType
@@ -56,11 +56,17 @@ class TrtThread(threading.Thread):
         # 사물 감지를 수행하는 TrtSSD 생성
         self.trt_ssd = TrtSSD(self.enginePath)
 
-        road_half_width_list = deque(maxlen=10)
-        road_half_width_list.append(165)
+        # road_half_width_list = deque(maxlen=10)
+        # road_half_width_list.append(165)
+        #
+        # pid_controller = pid.PIDController(round(datetime.utcnow().timestamp() * 1000))
+        # pid_controller.set_gain(0.63, -0.001, 0.23)
 
-        pid_controller = pid.PIDController(round(datetime.utcnow().timestamp() * 1000))
-        pid_controller.set_gain(0.63, -0.001, 0.23)
+        # road_center_x 초기화
+        road_center_x = -1
+
+        # road_center_point 초기화
+        road_center_point = (road_center_x, -1)
 
         # 입력 소스별로 이미지를 읽고 TrTSSD에게 감지 요청
         while self.running:
@@ -82,18 +88,15 @@ class TrtThread(threading.Thread):
 
                 if retval is True:
                     boxes, confs, clss = self.trt_ssd.detect(img, self.conf_th)
-                    line_retval, L_lines, R_lines = line_detect.line_detect(img)
 
-                    if line_retval == False:
+                    flag = self.ambulance.auto_drive(img, 0)
+                    if flag == -1:
                         with self.condition:
                             self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
                             self.condition.notify()
                         continue
 
-                    angle = line_detect.offset_detect(img, L_lines, R_lines, road_half_width_list)
-                    angle = pid_controller.equation(angle)
-
-                    self.ambulance.set_angle(angle)
+                    flag = self.ambulance.auto_drive(img, flag)
 
                     with self.condition:
                         self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss

@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import threading
 import time
+from ambulance.ambulance import Ambulance
 
 class MqttClient:
     def __init__(self, brokerip=None, brokerport=1883, subtopic=None, pubtopic=None ,ambulance=None):
@@ -39,6 +40,14 @@ class MqttClient:
                 self.__ambulance.handle_right()
             elif "front" in message.topic:
                 self.__ambulance.handle_refront()
+
+        elif "changemode" in message.topic:
+            if "auto" in message.topic:
+                self.__ambulance.set_mode(Ambulance.AUTO_MODE)
+                print("auto_drive_start")
+            if "manual" in message.topic:
+                self.__ambulance.set_mode(Ambulance.MANUAL_MODE)
+                print("manual_drive_start")
 
 
     def __run(self):

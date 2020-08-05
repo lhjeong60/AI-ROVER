@@ -62,7 +62,7 @@ class ResultImageMqttClient:
         b64_bytes = base64.b64encode(bytes)
         # MQTT Broker로 보내기
         self.client.publish(self.pubTopic, b64_bytes)
-        print("send!")
+        # print("send!")
 
     # 감지 결과 활용(처리)
     def handleDetectedObject(self, trtThread, condition):

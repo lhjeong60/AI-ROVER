@@ -67,6 +67,14 @@ def line_detect(frame):
 def offset_detect(img, L_lines, R_lines, road_half_width_list):
     h, w, _ = img.shape
 
+    # # road_center_x 초기화
+    # road_center_x = w / 2
+    #
+    # # road_center_point 초기화
+    # road_center_point = (road_center_x, h/2)
+    global road_center_x
+    global road_center_point
+
     # 고정 y 값
     y_fix = int(h * (2 / 3))
 
