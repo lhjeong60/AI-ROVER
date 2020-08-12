@@ -27,7 +27,8 @@ def line_detect(frame):
     ignore_mask_color = 255
     height, width = img_gray.shape
     # 320(w) x 240(h)일 때의 ROI/ 테스트 완료
-    vertices = np.array([[(0, height), (40, height / 2), (width-40, height / 2),
+    # 55, width-55 (직선) 수정 필요  // 곡선일때는 50 정도
+    vertices = np.array([[(0, height), (45, height / 2), (width-45, height / 2),
                           (width, height)]], dtype=np.int32)
     cv2.fillPoly(mask, vertices, ignore_mask_color)
     masked_img = cv2.bitwise_and(edges, mask)
@@ -60,20 +61,17 @@ def line_detect(frame):
     # 필터링된 직선 버리기
     L_lines, R_lines = line_arr[(slope_degree > 0), :], line_arr[(slope_degree < 0), :]
 
+    if len(L_lines) == 0 and len(R_lines) == 0:
+        line_retval = False
+        return line_retval, None, None
+
     line_retval = True
+    # print("L_lines : {:2d}, R_lines : {:2d}".format(len(L_lines), len(R_lines)))
     return line_retval, L_lines, R_lines
 
 
-def offset_detect(img, L_lines, R_lines, road_half_width_list):
+def offset_detect(img, L_lines, R_lines, L_x, R_x, road_half_width_list):
     h, w, _ = img.shape
-
-    # # road_center_x 초기화
-    # road_center_x = w / 2
-    #
-    # # road_center_point 초기화
-    # road_center_point = (road_center_x, h/2)
-    global road_center_x
-    global road_center_point
 
     # 고정 y 값
     y_fix = int(h * (2 / 3))
@@ -94,25 +92,28 @@ def offset_detect(img, L_lines, R_lines, road_half_width_list):
     if L_lines_detected and R_lines_detected:
         for each_line in L_lines:
             x1, y1, x2, y2 = each_line
-            # 직선 그리기
-            cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
             # 직선의 기울기
             slope = (y2 - y1) / (x2 - x1)
             # 교점의 x 좌표
             cross_x = ((y_fix - y1) / slope) + x1
 
+            # 직선 그리기
+            cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
             # 교점의 x 좌표 저장
             left_cross_points.append(cross_x)
 
+
         for each_line in R_lines:
             x1, y1, x2, y2 = each_line
-            # 직선 그리기
-            cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
             # 직선의 기울기
             slope = (y2 - y1) / (x2 - x1)
             # 교점의 x 좌표
             cross_x = ((y_fix - y1) / slope) + x1
 
+            # 직선 그리기
+            cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
             # 교점의 x 좌표 저장
             right_cross_points.append(cross_x)
 
@@ -131,23 +132,27 @@ def offset_detect(img, L_lines, R_lines, road_half_width_list):
     # 둘중 하나만 찾았을 경우
     elif L_lines_detected ^ R_lines_detected:
         road_half_width = np.mean(road_half_width_list)
+        road_width = 2 * road_half_width
 
         # 왼쪽 선만 찾았을 경우
         if L_lines_detected:
             for each_line in L_lines:
                 x1, y1, x2, y2 = each_line
-                # 직선 그리기
-                cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
                 # 직선의 기울기
                 slope = (y2 - y1) / (x2 - x1)
                 # 교점의 x 좌표
                 cross_x = ((y_fix - y1) / slope) + x1
 
+                # 직선 그리기
+                cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
                 # 교점의 x 좌표 저장
                 left_cross_points.append(cross_x)
 
             # 왼쪽선들만 찾았으니, 그중 가장 작은 x 좌표가 왼쪽 선
             left_line_x = min(left_cross_points)
+            right_line_x = left_line_x + road_width
+
             # 도로 중간 지점 저장
             road_center_x = left_line_x + road_half_width
             road_center_point = (int(road_center_x), y_fix)
@@ -156,20 +161,29 @@ def offset_detect(img, L_lines, R_lines, road_half_width_list):
         else:
             for each_line in R_lines:
                 x1, y1, x2, y2 = each_line
-                cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                
                 # 직선의 기울기
                 slope = (y2 - y1) / (x2 - x1)
                 # 교점의 x 좌표
                 cross_x = ((y_fix - y1) / slope) + x1
-
+                
+                # 직선 그리기
+                cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
                 # 교점의 x 좌표 저장
                 right_cross_points.append(cross_x)
 
             # 오른쪽선들만 찾았으니, 그중 가장 큰 x 좌표가 오른쪽 선
             right_line_x = max(right_cross_points)
+            left_line_x = right_line_x - road_width
+
             # 도로 중간 지점 저장
             road_center_x = right_line_x - road_half_width
             road_center_point = (int(road_center_x), y_fix)
+
+    # if L_x == -1 and R_x == -1:
+    #     print("L:{}, R:{}".format(len(L_lines), len(R_lines)))
+    L_x = int(left_line_x)
+    R_x = int(right_line_x)
 
     # 도로 중간 지점 / 자동차 중간 지점과 라인 시각화
     cv2.circle(img, road_center_point, 5, (255, 0, 0), -1)
@@ -184,7 +198,7 @@ def offset_detect(img, L_lines, R_lines, road_half_width_list):
     # 오른쪽으로 회전해야 하는 경우 각도가 음수, 왼쪽으로 회전해야하는 경우 양수
     angle = np.arctan2(offset_height, offset_width) * 180 / (np.pi) - 90
 
-    return angle
+    return angle, L_x, R_x
 
 # %% test
 if __name__ == '__main__':

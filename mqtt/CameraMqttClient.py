@@ -41,7 +41,8 @@ class ImageMqttPublisher:
         road_half_width_list = deque(maxlen=10)
         road_half_width_list.append(165)
         pid_controller = pid.PIDController(round(datetime.utcnow().timestamp() * 1000))
-        pid_controller.set_gain(0.63, -0.001, 0.23)
+        pid_controller.set_gain(0.55, -0.001, 0.23)
+#        pid_controller.set_gain(0.63, -0.001, 0.23)
 
         self.client.loop_start()
         while True:

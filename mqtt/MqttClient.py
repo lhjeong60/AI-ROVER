@@ -27,9 +27,9 @@ class MqttClient:
     def __on_message(self, client, userdata, message):
         if "backTire" in message.topic:
             if "forward" in message.topic:
-                self.__ambulance.forward()
+                self.__ambulance.forward(0.6)
             elif "backward" in message.topic:
-                self.__ambulance.backward()
+                self.__ambulance.backward(0.6)
             elif "stop" in message.topic:
                 self.__ambulance.stop()
 
@@ -48,6 +48,13 @@ class MqttClient:
             if "manual" in message.topic:
                 self.__ambulance.set_mode(Ambulance.MANUAL_MODE)
                 print("manual_drive_start")
+
+        elif "process" in message.topic:
+            # print(message.topic)
+            if "stop" in message.topic:
+                self.__ambulance.oled_thread_stop()
+                self.__stop = True
+                self.__client.disconnect()
 
 
     def __run(self):
