@@ -56,17 +56,11 @@ class TrtThread(threading.Thread):
         # 사물 감지를 수행하는 TrtSSD 생성
         self.trt_ssd = TrtSSD(self.enginePath)
 
-        # road_half_width_list = deque(maxlen=10)
-        # road_half_width_list.append(165)
-        #
-        # pid_controller = pid.PIDController(round(datetime.utcnow().timestamp() * 1000))
-        # pid_controller.set_gain(0.63, -0.001, 0.23)
-
         # road_center_x 초기화
-        road_center_x = -1
+        # road_center_x = -1
 
         # road_center_point 초기화
-        road_center_point = (road_center_x, -1)
+        # road_center_point = (road_center_x, -1)
 
         # 입력 소스별로 이미지를 읽고 TrTSSD에게 감지 요청
         while self.running:
@@ -107,6 +101,7 @@ class TrtThread(threading.Thread):
                         self.condition.notify()
                 else:
                     self.running = False
+
         # TrtSSD 소멸
         del self.trt_ssd
         # CUDA Context 소멸

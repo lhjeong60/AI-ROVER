@@ -24,9 +24,12 @@ class ResultImageMqttClient:
         self.client = mqtt.Client()
         self.client.on_connect = self.__on_connect
         self.client.on_disconnect = self.__on_disconnect
+        self.client.on_message = self.__on_message
         self.ambulance = ambulance
         self.camera = camera
         self.camera.camera_init()
+
+        self.trtThread = None
         print("camera instance constructed")
 
     def start(self):
@@ -39,9 +42,16 @@ class ResultImageMqttClient:
 
     def __on_connect(self, client, userdata, flags, rc):
         print("ResultImageMqttClient mqtt broker connect")
+        self.client.subscribe("command/process/stop")
 
     def __on_disconnect(self, client, userdata, rc):
         print("ResultImageMqttClient mqtt broker disconnect")
+
+    def __on_message(self, client, userdata, message):
+        if message.topic == "command/process/stop":
+            self.trtThread.stop()
+            self.disconnect()
+
 
     def disconnect(self):
         self.client.disconnect()
@@ -111,15 +121,15 @@ class ResultImageMqttClient:
         # 감지 결과(생산)와 처리(소비)를 동기화를 위한 Condition 얻기
         condition = threading.Condition()
         # TrtThread 객체 생성
-        trtThread = TrtThread(enginePath, TrtThread.INPUT_TYPE_USBCAM, videoCapture, 0.3, condition, ambulance)
+        self.trtThread = TrtThread(enginePath, TrtThread.INPUT_TYPE_USBCAM, videoCapture, 0.3, condition, ambulance)
         # 감지 시작
-        trtThread.start()
+        self.trtThread.start()
 
         # 감지 결과 처리(활용)
-        self.handleDetectedObject(trtThread, condition)
+        self.handleDetectedObject(self.trtThread, condition)
 
         # 감지 중지
-        trtThread.stop()
+        self.trtThread.stop()
 
         # VideoCapture 중지
         videoCapture.release()
