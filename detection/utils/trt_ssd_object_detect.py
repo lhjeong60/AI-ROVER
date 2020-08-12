@@ -94,6 +94,10 @@ class TrtThread(threading.Thread):
                         with self.condition:
                             self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
                             self.condition.notify()
+                        # 차선이 인식되지 않을 시 정지
+                        self.ambulance.stop()
+                        # 정지 후 수동모드로 전환
+                        self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
                         continue
 
                     flag = self.ambulance.auto_drive(img, flag)

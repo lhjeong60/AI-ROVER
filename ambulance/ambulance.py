@@ -131,6 +131,7 @@ class Ambulance:
         if flag == 0:
             line_retval, self.L_lines, self.R_lines = line_detect.line_detect(frame)
 
+            # 차선 검출이 안 되었을 때
             if line_retval == False:
                 return -1
             else:
