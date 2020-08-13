@@ -99,6 +99,14 @@ class TrtThread(threading.Thread):
                     with self.condition:
                         self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
                         self.condition.notify()
+
+                    if 1 in clss:
+                        clss_idx = clss.index(1)
+                        area = (boxes[clss_idx][2] - boxes[clss_idx][0]) * (boxes[clss_idx][3] - boxes[clss_idx][1])
+                        if area > 30000:
+                            self.ambulance.stop()
+                            self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+
                 else:
                     self.running = False
 
