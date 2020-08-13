@@ -1,5 +1,4 @@
 from mqtt.MqttClient import MqttClient
-from mqtt.CameraMqttClient_using_function import ImageMqttPublisher
 from ambulance.ambulance import Ambulance
 from utils.camera import Camera
 import detection.detect.obj_detect as obj_detect

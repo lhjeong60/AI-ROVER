@@ -156,7 +156,7 @@ class Ambulance:
                 angle = self.pid_controller.equation(angle)
                 self.set_angle(angle)
                 angle = abs(angle/30)
-                angle = 0.55 - (angle * 0.30)
+                angle = 0.6 - (angle * 0.3)
                 self.forward(angle)
 
             return 2

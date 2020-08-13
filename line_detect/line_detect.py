@@ -2,6 +2,34 @@ import cv2
 import numpy as np
 
 
+def birdeye(image):
+    img_height, img_width = image.shape[:2]
+
+    # Perspective points to be warped
+    # 대략적으로 차선이 존재하는 좌표 위치 1280,720
+    src = np.float32([[img_width * 0.25, img_height * 0.4],  # 좌상
+                      [img_width * 0.75, img_height * 0.4],  # 우상
+                      [img_width * 0.0, img_height * 0.9],  # 좌하
+                      [img_width * 1, img_height * 0.9]])  # 우하
+
+    # Window to be shown
+    # 차선 좌표 위치를 변환해서 출력할 윈도우 크기
+    dst = np.float32([[img_width * 0, 0],
+                      [img_width * 1, 0],
+                      [img_width * 0, img_height * 1],
+                      [img_width * 1, img_height * 1]])
+
+    # roi -> bird뷰 변환 행렬 구하기
+    M = cv2.getPerspectiveTransform(src, dst)
+
+    # bird뷰 -> roi 변환 행렬 구하기
+    Minv = cv2.getPerspectiveTransform(dst, src)
+
+    # bird뷰로 사진 변환
+    birdeye = cv2.warpPerspective(image, M, (img_width, img_height))
+
+    return birdeye, M, Minv
+
 def line_detect(frame):
     # =======================편한 사이즈로 재조정=========================
     # frame = cv2.resize(frame, dsize=(320, 480))
@@ -32,11 +60,17 @@ def line_detect(frame):
                           (width, height)]], dtype=np.int32)
     cv2.fillPoly(mask, vertices, ignore_mask_color)
     masked_img = cv2.bitwise_and(edges, mask)
+    
+    # birdeye 변환
+    # birdeye_img, M, Minv = birdeye(masked_img)
+
+
+    lines = cv2.HoughLinesP(masked_img, 1, np.pi / 180, 30, minLineLength=20, maxLineGap=20)
 
     # =========================Hough Transform을 이용한 직선 검출, 리턴된 lines는 (n, 1, 4)의 shape을 가진다.(n : 검출된 직선의 개수) =========================
     # threshold : 높을 수록 정확도는 올라가고, 적은 선을 찾음, 낮으면 많은 직선을 찾지만 대부분의 직선을 찾음
     # minLineLength : 찾을 직선의 최소 길이, maxLineGap : 선과의 최대 간격
-    lines = cv2.HoughLinesP(masked_img, 1, np.pi / 180, 30, minLineLength=10, maxLineGap=20)
+    # lines = cv2.HoughLinesP(masked_img, 1, np.pi / 180, 30, minLineLength=20, maxLineGap=20)
 
     if lines is None:
         line_retval = False

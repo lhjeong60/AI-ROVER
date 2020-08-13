@@ -13,7 +13,7 @@ sys.path.append(current_path)
 
 from ambulance.ambulance import Ambulance
 from detection.utils.trt_ssd_object_detect import TrtThread, BBoxVisualization
-from detection.utils.coco_label_map import CLASSES_DICT
+from detection.utils.sign_label_map import CLASSES_DICT
 import time
 
 class ResultImageMqttClient:
@@ -115,7 +115,7 @@ class ResultImageMqttClient:
     # 메인 함수
     def main(self, camera, ambulance):
         # 엔진 파일 경로
-        enginePath = project_path + "/models/ssd_mobilenet_v1_coco_2018_01_28/tensorrt_fp16.engine"
+        enginePath = project_path + "/models/ssd_mobilenet_v2_sign/tensorrt_fp16.engine"
         # 비디오 캡처 객체 얻기
         videoCapture = camera
         # 감지 결과(생산)와 처리(소비)를 동기화를 위한 Condition 얻기
