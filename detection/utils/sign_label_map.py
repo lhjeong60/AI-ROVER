@@ -5,7 +5,6 @@ CLASSES_LIST = [
     'yellow',
     'crosswalk',
     'schoolzone',
-    'curve',
     'stop',
     '60',
     '100',
@@ -28,7 +27,8 @@ CLASSES_LIST = [
     'P',
     'S',
     'T',
-    'road'
+    'road',
+    'curve'
 ]
 
 CLASSES_DICT = {i:n for i, n in enumerate(CLASSES_LIST)}

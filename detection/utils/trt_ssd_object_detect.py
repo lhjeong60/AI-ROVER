@@ -6,18 +6,6 @@ import ctypes
 import tensorrt as trt
 import random
 import colorsys
-import os
-import sys
-import paho.mqtt.client as mqtt
-import base64
-from datetime import datetime
-from collections import deque
-
-current_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-sys.path.append(current_path)
-
-import line_detect.line_detect as line_detect
-import utils.pid_controller as pid
 
 # -------------------------------------------------------------------------------------
 # CUDA 드라이버를 초기화하고 입력 이미지를 얻어 TrtSSD 클래스에게 감지를 위임하는 스레드 클래스
@@ -56,11 +44,7 @@ class TrtThread(threading.Thread):
         # 사물 감지를 수행하는 TrtSSD 생성
         self.trt_ssd = TrtSSD(self.enginePath)
 
-        # road_center_x 초기화
-        # road_center_x = -1
-
-        # road_center_point 초기화
-        # road_center_point = (road_center_x, -1)
+        flag = 0
 
         # 입력 소스별로 이미지를 읽고 TrTSSD에게 감지 요청
         while self.running:
@@ -83,29 +67,26 @@ class TrtThread(threading.Thread):
                 if retval is True:
                     boxes, confs, clss = self.trt_ssd.detect(img, self.conf_th)
 
-                    flag = self.ambulance.auto_drive(img, 0)
+                    flag, crosswalk_flag = self.ambulance.auto_drive(img, 0, False)
+
                     if flag == -1:
                         with self.condition:
                             self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
                             self.condition.notify()
-                        # 차선이 인식되지 않을 시 정지
-                        self.ambulance.stop()
-                        # 정지 후 수동모드로 전환
-                        self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
                         continue
 
-                    flag = self.ambulance.auto_drive(img, flag)
+                    flag, _ = self.ambulance.auto_drive(img, flag, crosswalk_flag)
 
                     with self.condition:
                         self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
                         self.condition.notify()
 
-                    if 1 in clss:
-                        clss_idx = clss.index(1)
-                        area = (boxes[clss_idx][2] - boxes[clss_idx][0]) * (boxes[clss_idx][3] - boxes[clss_idx][1])
-                        if area > 30000:
-                            self.ambulance.stop()
-                            self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+                    # if 1 in clss:
+                    #     clss_idx = clss.index(1)
+                    #     area = (boxes[clss_idx][2] - boxes[clss_idx][0]) * (boxes[clss_idx][3] - boxes[clss_idx][1])
+                    #     if area > 30000:
+                    #         self.ambulance.stop()
+                    #         self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
 
                 else:
                     self.running = False

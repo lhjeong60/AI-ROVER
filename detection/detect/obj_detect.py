@@ -3,7 +3,6 @@ import sys
 import cv2
 import threading
 import base64
-import numpy as np
 import paho.mqtt.client as mqtt
 
 # 프로젝트 폴더를 sys.path에 추가(Jetson Nano에서 직접 실행할 때 필요)
@@ -30,11 +29,8 @@ class ResultImageMqttClient:
         self.camera.camera_init()
 
         self.trtThread = None
-        print("camera instance constructed")
 
     def start(self):
-        # thread = threading.Thread(target=self.main, args=[self.camera, self.ambulance], daemon=False)
-        # thread.start()
         self.client.connect(self.brokerIp, self.brokerPort)
         self.client.loop_start()
         self.main(self.camera, self.ambulance)
@@ -42,16 +38,15 @@ class ResultImageMqttClient:
 
     def __on_connect(self, client, userdata, flags, rc):
         print("ResultImageMqttClient mqtt broker connect")
-        self.client.subscribe("command/process/stop")
+        self.client.subscribe("command/1/process/stop")
 
     def __on_disconnect(self, client, userdata, rc):
         print("ResultImageMqttClient mqtt broker disconnect")
 
     def __on_message(self, client, userdata, message):
-        if message.topic == "command/process/stop":
+        if message.topic == "command/1/process/stop":
             self.trtThread.stop()
             self.disconnect()
-
 
     def disconnect(self):
         self.client.disconnect()
@@ -86,15 +81,16 @@ class ResultImageMqttClient:
         # 바운딩 박스 시각화 객체
         vis = BBoxVisualization(CLASSES_DICT)
 
-        # print("before while")
         # TrtThread가 실행 중일 때 반복 실행
         while trtThread.running:
-            # print("in while")
             with condition:
                 # 감지 결과가 있을 때까지 대기
                 condition.wait()
                 # 감지 결과 얻기
                 img, boxes, confs, clss = trtThread.getDetectResult()
+            for cls in clss:
+                if cls in range(13, 28, 1):
+                    print(CLASSES_DICT.get(cls))
 
             # 감지 결과 출력
             img = vis.drawBboxes(img, boxes, confs, clss)
@@ -110,12 +106,10 @@ class ResultImageMqttClient:
             fps = curr_fps if fps == 0.0 else (fps * 0.95 + curr_fps * 0.05)    # 지수 감소 평균
             tic = toc
 
-
-
     # 메인 함수
     def main(self, camera, ambulance):
         # 엔진 파일 경로
-        enginePath = project_path + "/models/ssd_mobilenet_v2_sign/tensorrt_fp16.engine"
+        enginePath = project_path + "/models/ssd_mobilenet_v2_sign7/tensorrt_fp16.engine"
         # 비디오 캡처 객체 얻기
         videoCapture = camera
         # 감지 결과(생산)와 처리(소비)를 동기화를 위한 Condition 얻기
