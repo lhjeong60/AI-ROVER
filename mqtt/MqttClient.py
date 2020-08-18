@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import threading
 import time
+import json
 from ambulance.ambulance import Ambulance
 
 class MqttClient:
@@ -49,6 +50,10 @@ class MqttClient:
                 self.__ambulance.set_mode(Ambulance.MANUAL_MODE)
                 print("manual_drive_start")
 
+        elif "road" in message.topic:
+            if "change" in message.topic:
+                self.__ambulance.change_road()
+
         elif "process" in message.topic:
             # print(message.topic)
             if "stop" in message.topic:
@@ -61,8 +66,8 @@ class MqttClient:
         self.__client.connect(self.__brokerip, self.__brokerport)
         self.__client.loop_start()
         while not self.__stop:
-            self.__client.publish(self.__pubtopic ,self.__ambulance.get_voltage_percentage())
-            time.sleep(1)
+            self.__client.publish("ambulance/1/status", json.dumps(self.__ambulance.get_status()))
+            time.sleep(0.2)
         self.__client.loop_stop()
 
 
