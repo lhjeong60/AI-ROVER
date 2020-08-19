@@ -190,20 +190,6 @@ class ImageMqttPublisher:
     def __on_disconnect(self, client, userdata, rc):
         print("ImageMqttClient mqtt broker disconnect")
 
-    # def __on_message(self, client, userdata, message):
-    #     if "capture" in message.topic:
-    #         retval, frame = self.camera.videoCapture.read()
-    #         if retval:
-    #             img = np.copy(frame)
-    #             cv2.imwrite("/home/pi/Project/SensingRover/capture/capture_image" + str(self.__cnt) + ".jpg", img)
-    #             self.__cnt += 1
-    #             capval, bytes = cv2.imencode(".jpg", frame)
-    #             if capval:
-    #                 cap_b64_bytes = base64.b64encode(bytes)
-    #                 self.client.publish("/capturepub", cap_b64_bytes)
-    #                 print("pub complete")
-
-
     def disconnect(self):
         self.client.disconnect()
 

@@ -30,12 +30,12 @@ class Capture_thread:
 
 
     def camara_init(self):
-        self.capture = cv2.VideoCapture(self.gstreamer_pipline(640, 360, 60, 0, 640, 360), cv2.CAP_GSTREAMER)
+        self.capture = cv2.VideoCapture(self.gstreamer_pipline(320, 240, 60, 0, 320, 240), cv2.CAP_GSTREAMER)
 
     def run(self):
         while True:
             if (self.capture.get(cv2.CAP_PROP_POS_FRAMES) == self.capture.get(cv2.CAP_PROP_FRAME_COUNT)):
-                self.capture.open(self.gstreamer_pipline(640, 360, 60, 0, 640, 360), cv2.CAP_GSTREAMER)
+                self.capture.open(self.gstreamer_pipline(320, 240, 60, 0, 320, 240), cv2.CAP_GSTREAMER)
 
             ret, frame = self.capture.read()
             cv2.imshow("VideoFrame", frame)

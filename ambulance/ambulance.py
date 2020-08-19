@@ -32,7 +32,7 @@ class Ambulance:
 
         # 모터 제어
         self.__motor_control = NvidiaRacecar()
-        self.__stop_flag = False
+        self.stop_flag = False
 
 
         # Oled 표시, 스레딩
@@ -48,6 +48,7 @@ class Ambulance:
 
         # =================car status==========================
         self.__working = False
+        self.__position = None
 
         # =================pid controller======================
         self.pid_controller = PIDController(round(datetime.utcnow().timestamp() * 1000))
@@ -61,6 +62,8 @@ class Ambulance:
         self.prev_road_center_x = deque(maxlen=5)
         self.prev_road_center_x.append(120)
 
+        # 플래그 들
+        self.crosswalk_flag = False
         self.which_side = None
         self.change_road_flag = False
         self.init_flag = None
@@ -76,6 +79,8 @@ class Ambulance:
 
         # =======================count============================
         self.count = 0
+        self.stop_count = 0
+
     def __oled_setting(self):
         while self.__oled_flag:
             self.__oled.set_text(ip.get_ip_address_wlan0() + "\n" + pw.get_power_status())
@@ -122,11 +127,11 @@ class Ambulance:
         self.__motor_direction = "backward"
 
     def forward(self, speed):
-        if self.__stop_flag:
+        if self.stop_flag:
             self.__motor_control.throttle = 0
-            self.__motor_control.throttle_gain = 0.9
+            self.__motor_control.throttle_gain = 1.0
             self.__motor_control.throttle = -1
-            self.__stop_flag = False
+            self.stop_flag = False
         self.__motor_control.throttle = 0
         self.__motor_control.throttle_gain = speed
         self.__motor_control.throttle = -1
@@ -138,7 +143,7 @@ class Ambulance:
         self.__dcMotor_speed = 0
         self.__motor_control.throttle_gain = self.__dcMotor_speed
         self.__motor_control.throttle = self.__dcMotor_speed
-        self.__stop_flag = True
+        self.stop_flag = True
         self.__motor_direction = "stop"
     # ===========================핸들 각도 제어(자율 주행)==========================
 
@@ -155,28 +160,40 @@ class Ambulance:
     # ===========================자율 주행 =====================================
     def set_mode(self, mode):
         self.__mode = mode
+        self.print_mode()
 
-    def auto_drive(self, frame, flag, crosswalk_flag):
+    def print_mode(self):
+        if self.__mode == Ambulance.AUTO_MODE:
+            print("auto_drive_start")
+        else:
+            print("manual_drive_start")
+
+
+    def get_mode(self):
+        return self.__mode
+
+    def auto_drive(self, frame, flag):
+        # 처음 시작할 때만 횡단보도, 차선 플래그 set
         if self.init_flag is None:
             temp_birdeye, M, Minv = line_detect.birdeye(line_detect.img_preprocessing(frame))
-            crosswalk_flag, self.which_side = line_detect.get_crosswalk_flag(temp_birdeye), line_detect.get_which_side(temp_birdeye)
+            self.crosswalk_flag, self.which_side = line_detect.get_crosswalk_flag(temp_birdeye), line_detect.get_which_side(temp_birdeye)
             self.init_flag = -1
         
         # 차선 검출
         if flag == 0:
-            crosswalk_flag, line_retval, self.L_lines, self.R_lines = line_detect.line_detect(frame)
+            self.crosswalk_flag, line_retval, self.L_lines, self.R_lines = line_detect.line_detect(frame)
 
             # 차선 검출이 안 되었을 때
             if line_retval == False:
-                return -1, False
+                return -1
             else:
-                return 1, crosswalk_flag
+                return 1
         
-        # 차선 검출 후 offset 계산 및 제어
+        # offset 계산 및 제어
         if flag == 1:
             # 차선 변경을 하지 않을 때
             if not self.change_road_flag:
-                angle, self.L_x, self.R_x = line_detect.offset_detect(frame, crosswalk_flag, self.which_side, self.L_lines, self.R_lines, self.L_x, self.R_x, self.road_half_width_list, self.prev_road_center_x)
+                angle, self.L_x, self.R_x = line_detect.offset_detect(frame, self.crosswalk_flag, self.which_side, self.L_lines, self.R_lines, self.L_x, self.R_x, self.road_half_width_list, self.prev_road_center_x)
                 
                 # 자율 주행 모드일 때만 동작
                 if self.__mode == self.AUTO_MODE:
@@ -186,51 +203,51 @@ class Ambulance:
                     
                     # 회전할 각도의 절대량에 따라 속도를 감속
                     if angle < 10:
-                        angle = 0.51 - (angle/200)
+                        angle = 0.55 - (angle/200)
                     elif 10 <= angle < 20:
-                        angle = 0.49
+                        angle = 0.53
                     else:
-                        angle = 0.47
+                        angle = 0.51
                     
-                    # 적외선 센서 사용
-                    distance_stop_flag = False
-                    cm = self.__distance.read()
+                    # # 적외선 센서 사용
+                    # distance_stop_flag = False
+                    # cm = self.__distance.read()
+                    #
+                    # # 많이 튀는 값 날리기
+                    # if abs(cm - self.pre) < 5:
+                    #     # 최대 최소로 제한
+                    #     if cm > 80:
+                    #         cm = 80
+                    #     elif cm < 0:
+                    #         cm = 0
+                    #
+                    #     # 완전히 가까워지면 확실하게 정지
+                    #     if cm <= 25:
+                    #         self.stop()
+                    #         self.backward(0.4)
+                    #         distance_stop_flag = True
+                    #     # 가까운 물체가 감지되면 정지 시작
+                    #     elif 25 < cm <= 35:
+                    #         self.stop()
+                    #         self.backward(0.25)
+                    #
+                    #     # 물체가 감지되지 않으면 그냥 주행
+                    #     else:
+                    #         if distance_stop_flag:
+                    #             self.forward(1.0)
+                    #             distance_stop_flag = False
+                    self.forward(angle)
+                    # self.pre = cm
 
-                    # 많이 튀는 값 날리기
-                    if abs(cm - self.pre) < 5:
-                        # 최대 최소로 제한
-                        if cm > 80:
-                            cm = 80
-                        elif cm < 0:
-                            cm = 0
-
-                        # 완전히 가까워지면 확실하게 정지
-                        if cm <= 25:
-                            self.stop()
-                            self.backward(0.4)
-                            distance_stop_flag = True
-                        # 가까운 물체가 감지되면 정지 시작
-                        elif 25 < cm <= 35:
-                            self.stop()
-                            self.backward(0.25)
-
-                        # 물체가 감지되지 않으면 그냥 주행
-                        else:
-                            if distance_stop_flag:
-                                self.forward(1.0)
-                                distance_stop_flag = False
-                            self.forward(angle)
-                    self.pre = cm
-
-                return 2, crosswalk_flag
+                return 2
 
             # 차선 변경 시 동작
             else:
                 # 오른쪽 차선에 있을 때
                 if not self.which_side:
-                    if self.count < 16:
+                    if self.count < 15:
                         # 핸들 왼쪽으로 꺾
-                        self.set_angle(16)
+                        self.set_angle(18)
                         self.forward(0.56)
                         self.count += 1
 
@@ -242,9 +259,9 @@ class Ambulance:
 
                 # 왼쪽 차선에 있을 때
                 else:
-                    if self.count < 16:
+                    if self.count < 15:
                         # 핸들 오른쪽으로 꺾
-                        self.set_angle(-16)
+                        self.set_angle(-18)
                         self.forward(0.56)
                         self.count += 1
 
@@ -254,7 +271,7 @@ class Ambulance:
                             self.change_road_flag = False
                             self.count = 0
 
-                return 2, False
+                return 2
 
     # ===========================차선 상태 변경=================================
     def change_road(self):
@@ -283,6 +300,7 @@ class Ambulance:
     def set_working(self, work):
         self.__working = work
 
+    # ===========================차 상태 저장 & 반환 ==================================
     def get_status(self):
         status = {}
         status["battery"] = self.get_voltage_percentage()
@@ -293,3 +311,10 @@ class Ambulance:
         status["working"] = self.__working
 
         return status
+
+    # =============================차 위치=========================================
+    def get_position(self):
+        return self.__position
+
+    def set_position(self, position):
+        self.__position = position

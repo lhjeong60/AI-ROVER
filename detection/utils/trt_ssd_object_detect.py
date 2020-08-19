@@ -67,7 +67,7 @@ class TrtThread(threading.Thread):
                 if retval is True:
                     boxes, confs, clss = self.trt_ssd.detect(img, self.conf_th)
 
-                    flag, crosswalk_flag = self.ambulance.auto_drive(img, 0, False)
+                    flag = self.ambulance.auto_drive(img, 0)
 
                     if flag == -1:
                         with self.condition:
@@ -75,19 +75,11 @@ class TrtThread(threading.Thread):
                             self.condition.notify()
                         continue
 
-                    flag, _ = self.ambulance.auto_drive(img, flag, crosswalk_flag)
+                    flag = self.ambulance.auto_drive(img, flag)
 
                     with self.condition:
                         self.img, self.boxes, self.confs, self.clss = img, boxes, confs, clss
                         self.condition.notify()
-
-                    # if 1 in clss:
-                    #     clss_idx = clss.index(1)
-                    #     area = (boxes[clss_idx][2] - boxes[clss_idx][0]) * (boxes[clss_idx][3] - boxes[clss_idx][1])
-                    #     if area > 30000:
-                    #         self.ambulance.stop()
-                    #         self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
-
                 else:
                     self.running = False
 

@@ -45,10 +45,8 @@ class MqttClient:
         elif "changemode" in message.topic:
             if "auto" in message.topic:
                 self.__ambulance.set_mode(Ambulance.AUTO_MODE)
-                print("auto_drive_start")
             if "manual" in message.topic:
                 self.__ambulance.set_mode(Ambulance.MANUAL_MODE)
-                print("manual_drive_start")
 
         elif "road" in message.topic:
             if "change" in message.topic:
