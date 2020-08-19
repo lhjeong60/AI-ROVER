@@ -112,6 +112,10 @@ class ResultImageMqttClient:
         # 바운딩 박스 시각화 객체
         vis = BBoxVisualization(CLASSES_DICT)
 
+        cnt = 0
+        stop = 0
+        cur_obj = ""
+
         # TrtThread가 실행 중일 때 반복 실행
         while trtThread.running:
             with condition:
@@ -120,18 +124,22 @@ class ResultImageMqttClient:
                 # 감지 결과 얻기
                 img, boxes, confs, clss = trtThread.getDetectResult()
             # 감지된 객체 인덱스
-            for cls, box in zip(clss, boxes):
+            for val, box in zip(clss, boxes):
                 # 알파벳 인덱스 범위에 포함되면, 위치 정보 저장 및 발행
-                if cls in range(13, 28, 1):
+                if val in range(13, 28, 1):
                     # 이전의 위치정보와 비교해서 다를 때만 저장 및 발행
-                    if not (self.prev_position == CLASSES_DICT.get(cls)):
-                        self.ambulance.set_position(CLASSES_DICT.get(cls))
+                    if not (self.prev_position == CLASSES_DICT.get(val)):
+                        cur_loc = CLASSES_DICT.get(val)
+                        self.ambulance.set_position(CLASSES_DICT.get(val))
                         self.client.publish("ambulance/1/position", self.ambulance.get_position())
-                        print(CLASSES_DICT.get(cls))
+                        print(CLASSES_DICT.get(val))
                         self.prev_position = self.ambulance.get_position()
+                else:
+                    cur_obj = CLASSES_DICT.get(val)
+                    self.client.publish("ambulance/2/object", CLASSES_DICT.get(val))
 
                 # 장애물(cone)
-                if cls == 11:
+                if val == 11:
                     # 바운딩 박스 크기, 위치 조사
                     x1, y1, x2, y2 = box
                     box_area = abs((x2 - x1) * (y2 - y1))
@@ -151,21 +159,48 @@ class ResultImageMqttClient:
                                     self.ambulance.change_road()
 
                 # 횡단보도(crosswalk) 아직 안됨
-                if cls == 4:
-                    if self.ambulance.get_mode() == Ambulance.AUTO_MODE and not self.ambulance.stop_flag:
-                        self.ambulance.set_mode(Ambulance.MANUAL_MODE)
-                        self.ambulance.stop()
-                    else:
-                        if self.ambulance.stop_count < 105:
-                            if self.ambulance.stop_count > 100:
-                                self.ambulance.forward(0.9)
-                            elif self.ambulance.stop_count == 104:
-                                self.ambulance.set_mode(Ambulance.AUTO_MODE)
-                            self.ambulance.stop_count += 1
+                if val == 4:
+                    pass
+
 
                 # 방지턱(bump)
-                if cls == 12:
+                if val == 12:
                     pass
+
+                if cur_loc == self.dst:
+                    if stop == 0:
+                        self.ambulance.stop()
+                        self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+                        stop = 1
+
+                elif CLASSES_DICT.get(val) == 'stop':
+                    if stop == 0:
+                        self.ambulance.stop()
+                        self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+                        stop = 1
+
+                elif CLASSES_DICT.get(val) == 'schoolzone':
+                    self.ambulance.forward(0.51)
+                elif CLASSES_DICT.get(val) == 'red' or CLASSES_DICT.get(val) == 'yellow':
+                    self.ambulance.stop()
+                    self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+
+                elif CLASSES_DICT.get(val) == 'green':
+                    self.ambulance.set_mode(self.ambulance.AUTO_MODE)
+                elif CLASSES_DICT.get(val) == '100':
+                    self.ambulance.forward(0.61)
+
+                print("[인식객체]", cur_obj)
+
+
+            if stop == 1:
+                cnt += 1
+            if cnt == 100:
+                self.ambulance.forward(0.62)
+                self.ambulance.set_mode(self.ambulance.AUTO_MODE)
+            if cnt == 180:
+                stop = 0
+                cnt = 0
 
             # 감지 결과 출력
             img = vis.drawBboxes(img, boxes, confs, clss)

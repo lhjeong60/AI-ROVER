@@ -67,6 +67,7 @@ class Ambulance:
         self.which_side = None
         self.change_road_flag = False
         self.init_flag = None
+        self.stop_and_forward_flag = False
 
         self.L_lines = []
         self.R_lines = []
@@ -145,6 +146,20 @@ class Ambulance:
         self.__motor_control.throttle = self.__dcMotor_speed
         self.stop_flag = True
         self.__motor_direction = "stop"
+
+    # ===========================정지 후 출발 ====================================
+    def stop_and_forward(self):
+        if self.stop_flag and self.stop_and_forward_flag:
+            if self.__mode == Ambulance.AUTO_MODE:
+                self.set_mode(Ambulance.MANUAL_MODE)
+
+            if self.stop_count < 103:
+                self.stop()
+                self.stop_count += 1
+                if self.stop_count > 99:
+                    self.forward(0.7)
+
+
     # ===========================핸들 각도 제어(자율 주행)==========================
 
     def set_angle(self, angle):
