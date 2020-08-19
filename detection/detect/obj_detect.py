@@ -33,6 +33,8 @@ class ResultImageMqttClient:
 
         self.trtThread = None
 
+        self.dst = "x"
+
         # 횡단보도, 정지사인, 신호등(RED) 정지 플래그
         self.stop_flag = False
 
@@ -54,6 +56,7 @@ class ResultImageMqttClient:
         print("ResultImageMqttClient mqtt broker connect")
         self.client.subscribe("command/1/process/stop")
         self.client.subscribe("/res/ambulance1")
+        self.client.subscribe("car/2/destination")
 
     def __on_disconnect(self, client, userdata, rc):
         print("ResultImageMqttClient mqtt broker disconnect")
@@ -62,6 +65,11 @@ class ResultImageMqttClient:
         if message.topic == "command/1/process/stop":
             self.trtThread.stop()
             self.disconnect()
+
+        if message.topic == "car/2/destination":
+            self.dst = str(message.payload, encoding="UTF-8")
+            # print(self.dst)
+
         elif message.topic == "/res/ambulance1":
             content = str(message.payload, encoding="utf-8")
             self.set_res.add(content)
@@ -115,6 +123,7 @@ class ResultImageMqttClient:
         cnt = 0
         stop = 0
         cur_obj = ""
+        cur_loc = ""
 
         # TrtThread가 실행 중일 때 반복 실행
         while trtThread.running:
