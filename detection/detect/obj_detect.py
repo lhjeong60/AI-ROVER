@@ -56,7 +56,6 @@ class ResultImageMqttClient:
         print("ResultImageMqttClient mqtt broker connect")
         self.client.subscribe("command/1/process/stop")
         self.client.subscribe("/res/ambulance1")
-        self.client.subscribe("car/2/destination")
 
     def __on_disconnect(self, client, userdata, rc):
         print("ResultImageMqttClient mqtt broker disconnect")
@@ -65,10 +64,6 @@ class ResultImageMqttClient:
         if message.topic == "command/1/process/stop":
             self.trtThread.stop()
             self.disconnect()
-
-        if message.topic == "car/2/destination":
-            self.dst = str(message.payload, encoding="UTF-8")
-            # print(self.dst)
 
         elif message.topic == "/res/ambulance1":
             content = str(message.payload, encoding="utf-8")
@@ -145,7 +140,7 @@ class ResultImageMqttClient:
                         self.prev_position = self.ambulance.get_position()
                 else:
                     cur_obj = CLASSES_DICT.get(val)
-                    self.client.publish("ambulance/2/object", CLASSES_DICT.get(val))
+                    self.client.publish("ambulance/1/object", CLASSES_DICT.get(val))
 
                 # 장애물(cone)
                 if val == 11:
@@ -168,15 +163,18 @@ class ResultImageMqttClient:
                                     self.ambulance.change_road()
 
                 # 횡단보도(crosswalk) 아직 안됨
-                if val == 4:
-                    pass
+                if CLASSES_DICT.get(val) == "crosswalk":
+                    if stop == 0:
+                        self.ambulance.stop()
+                        self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+                        stop = 1
 
 
                 # 방지턱(bump)
                 if val == 12:
                     pass
 
-                if cur_loc == self.dst:
+                if cur_loc == self.ambulance.get_dst():
                     if stop == 0:
                         self.ambulance.stop()
                         self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
@@ -189,7 +187,7 @@ class ResultImageMqttClient:
                         stop = 1
 
                 elif CLASSES_DICT.get(val) == 'schoolzone':
-                    self.ambulance.forward(0.51)
+                    self.ambulance.forward(0.5)
                 elif CLASSES_DICT.get(val) == 'red' or CLASSES_DICT.get(val) == 'yellow':
                     self.ambulance.stop()
                     self.ambulance.set_mode(self.ambulance.MANUAL_MODE)

@@ -5,11 +5,10 @@ import json
 from ambulance.ambulance import Ambulance
 
 class MqttClient:
-    def __init__(self, brokerip=None, brokerport=1883, subtopic=None, pubtopic=None ,ambulance=None):
+    def __init__(self, brokerip=None, brokerport=1883, subtopic=None, ambulance=None):
         self.__brokerip = brokerip
         self.__brokerport = brokerport
         self.__subtopic = subtopic
-        self.__pubtopic = pubtopic
         self.__client = mqtt.Client()
         self.__client.on_connect = self.__on_connect
         self.__client.on_disconnect = self.__on_disconnect
@@ -20,6 +19,7 @@ class MqttClient:
     def __on_connect(self, client, userdata, flags, rc):
         print("** connection **")
         self.__client.subscribe(self.__subtopic)
+        self.__client.subscribe("car/1/destination")
 
 
     def __on_disconnect(self, client, userdata, rc):
@@ -58,6 +58,11 @@ class MqttClient:
                 self.__ambulance.oled_thread_stop()
                 self.__stop = True
                 self.__client.disconnect()
+
+        elif message.topic == "car/1/destination":
+            dst = str(message.payload, encoding="UTF-8")
+            self.__ambulance.set_dst(dst)
+
 
 
     def __run(self):

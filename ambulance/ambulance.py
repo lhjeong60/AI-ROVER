@@ -49,6 +49,7 @@ class Ambulance:
         # =================car status==========================
         self.__working = False
         self.__position = None
+        self.__dst = None
 
         # =================pid controller======================
         self.pid_controller = PIDController(round(datetime.utcnow().timestamp() * 1000))
@@ -128,16 +129,38 @@ class Ambulance:
         self.__motor_direction = "backward"
 
     def forward(self, speed):
-        if self.stop_flag:
-            self.__motor_control.throttle = 0
-            self.__motor_control.throttle_gain = 1.0
-            self.__motor_control.throttle = -1
-            self.stop_flag = False
-        self.__motor_control.throttle = 0
-        self.__motor_control.throttle_gain = speed
-        self.__motor_control.throttle = -1
-        self.__dcMotor_speed = speed
-        self.__motor_direction = "forward"
+        # 적외선 센서 사용
+        cm = self.__distance.read()
+
+        # 많이 튀는 값 날리기
+        if abs(cm - self.pre) < 5:
+            # 최대 최소로 제한
+            if cm > 80:
+                cm = 80
+            elif cm < 0:
+                cm = 0
+
+            # 완전히 가까워지면 확실하게 정지
+            if cm <= 25:
+                self.stop()
+                self.backward(0.4)
+            # 가까운 물체가 감지되면 정지 시작
+            elif 25 < cm <= 35:
+                self.stop()
+                self.backward(0.25)
+
+            # 물체가 감지되지 않으면 그냥 주행
+            else:
+                if self.stop_flag:
+                    self.__motor_control.throttle = 0
+                    self.__motor_control.throttle_gain = 1.0
+                    self.__motor_control.throttle = -1
+                    self.stop_flag = False
+                self.__motor_control.throttle = 0
+                self.__motor_control.throttle_gain = speed
+                self.__motor_control.throttle = -1
+                self.__dcMotor_speed = speed
+                self.__motor_direction = "forward"
 
     def stop(self):
         # print("stop")
@@ -224,33 +247,7 @@ class Ambulance:
                     else:
                         angle = 0.51
                     
-                    # # 적외선 센서 사용
-                    # distance_stop_flag = False
-                    # cm = self.__distance.read()
-                    #
-                    # # 많이 튀는 값 날리기
-                    # if abs(cm - self.pre) < 5:
-                    #     # 최대 최소로 제한
-                    #     if cm > 80:
-                    #         cm = 80
-                    #     elif cm < 0:
-                    #         cm = 0
-                    #
-                    #     # 완전히 가까워지면 확실하게 정지
-                    #     if cm <= 25:
-                    #         self.stop()
-                    #         self.backward(0.4)
-                    #         distance_stop_flag = True
-                    #     # 가까운 물체가 감지되면 정지 시작
-                    #     elif 25 < cm <= 35:
-                    #         self.stop()
-                    #         self.backward(0.25)
-                    #
-                    #     # 물체가 감지되지 않으면 그냥 주행
-                    #     else:
-                    #         if distance_stop_flag:
-                    #             self.forward(1.0)
-                    #             distance_stop_flag = False
+
                     self.forward(angle)
                     # self.pre = cm
 
@@ -333,3 +330,10 @@ class Ambulance:
 
     def set_position(self, position):
         self.__position = position
+
+    # ==============================목적지==========================================
+    def get_dst(self):
+        return self.__dst
+
+    def set_dst(self, dst):
+        self.__dst = dst
