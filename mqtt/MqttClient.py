@@ -28,9 +28,11 @@ class MqttClient:
     def __on_message(self, client, userdata, message):
         if "backTire" in message.topic:
             if "forward" in message.topic:
-                self.__ambulance.forward(0.6)
+                self.__ambulance.set_speed(0.6)
+                self.__ambulance.forward()
             elif "backward" in message.topic:
-                self.__ambulance.backward(0.6)
+                self.__ambulance.set_speed(0.6)
+                self.__ambulance.backward()
             elif "stop" in message.topic:
                 self.__ambulance.stop()
 
@@ -45,6 +47,7 @@ class MqttClient:
         elif "changemode" in message.topic:
             if "auto" in message.topic:
                 self.__ambulance.set_mode(Ambulance.AUTO_MODE)
+                self.__ambulance.set_max_speed(0.55)
             if "manual" in message.topic:
                 self.__ambulance.set_mode(Ambulance.MANUAL_MODE)
 
@@ -62,6 +65,8 @@ class MqttClient:
         elif message.topic == "car/1/destination":
             dst = str(message.payload, encoding="UTF-8")
             self.__ambulance.set_dst(dst)
+            self.__ambulance.set_working(True)
+            self.__ambulance.set_mode(Ambulance.AUTO_MODE)
 
 
 

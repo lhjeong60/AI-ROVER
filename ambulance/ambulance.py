@@ -28,6 +28,7 @@ class Ambulance:
         # 센서 객체 생성
         self.__pcf8591 = Pcf8591(0x48)
         self.__distance = Distance(self.__pcf8591)
+        self.cm = 0
         self.pre = 0
 
         # 모터 제어
@@ -43,7 +44,8 @@ class Ambulance:
 
         # =================motor values========================
         self.__handle_angle = 0
-        self.__dcMotor_speed = 0
+        self.__dcMotor_speed = 0.55
+        self.__max_speed = self.__dcMotor_speed
         self.__motor_direction = "stop"
 
         # =================car status==========================
@@ -55,7 +57,7 @@ class Ambulance:
         self.pid_controller = PIDController(round(datetime.utcnow().timestamp() * 1000))
         # self.pid_controller.set_gain(0.63, -0.001, 0.23)
 #        self.pid_controller.set_gain(0.61, 0, 0.22)
-        self.pid_controller.set_gain(0.55, 0, 0.23)
+        self.pid_controller.set_gain(0.55, 0, 0.22)
         # ==================line detect variable===============
         self.road_half_width_list = deque(maxlen=10)
         self.road_half_width_list.append(100)
@@ -122,45 +124,47 @@ class Ambulance:
 
     # =============================속도 원격 제어=============================
 
-    def backward(self, speed):
-        self.__motor_control.throttle_gain = speed
+    def backward(self):
+        self.__motor_control.throttle = 0
+        self.__motor_control.throttle_gain = self.__dcMotor_speed
         self.__motor_control.throttle = 1
-        self.__dcMotor_speed = speed
         self.__motor_direction = "backward"
 
-    def forward(self, speed):
-        # 적외선 센서 사용
-        cm = self.__distance.read()
-
+    def forward(self):
         # 많이 튀는 값 날리기
-        if abs(cm - self.pre) < 5:
+        if abs(self.cm - self.pre) < 5:
             # 최대 최소로 제한
-            if cm > 80:
-                cm = 80
-            elif cm < 0:
-                cm = 0
+            if self.cm > 80:
+                self.cm = 80
+            elif self.cm < 0:
+                self.cm = 0
 
             # 완전히 가까워지면 확실하게 정지
-            if cm <= 25:
+            if self.cm <= 25:
                 self.stop()
-                self.backward(0.4)
+                self.set_speed(0.4)
+                self.backward()
             # 가까운 물체가 감지되면 정지 시작
-            elif 25 < cm <= 35:
+            elif 25 < self.cm <= 35:
                 self.stop()
-                self.backward(0.25)
+                self.set_speed(0.25)
+                self.backward()
+
+            return
 
             # 물체가 감지되지 않으면 그냥 주행
-            else:
-                if self.stop_flag:
-                    self.__motor_control.throttle = 0
-                    self.__motor_control.throttle_gain = 1.0
-                    self.__motor_control.throttle = -1
-                    self.stop_flag = False
-                self.__motor_control.throttle = 0
-                self.__motor_control.throttle_gain = speed
-                self.__motor_control.throttle = -1
-                self.__dcMotor_speed = speed
-                self.__motor_direction = "forward"
+
+
+        if self.stop_flag:
+            self.__motor_control.throttle = 0
+            self.__motor_control.throttle_gain = 1.0
+            self.__motor_control.throttle = -1
+            self.stop_flag = False
+
+        self.__motor_control.throttle = 0
+        self.__motor_control.throttle_gain = self.__dcMotor_speed
+        self.__motor_control.throttle = -1
+        self.__motor_direction = "forward"
 
     def stop(self):
         # print("stop")
@@ -169,18 +173,6 @@ class Ambulance:
         self.__motor_control.throttle = self.__dcMotor_speed
         self.stop_flag = True
         self.__motor_direction = "stop"
-
-    # ===========================정지 후 출발 ====================================
-    def stop_and_forward(self):
-        if self.stop_flag and self.stop_and_forward_flag:
-            if self.__mode == Ambulance.AUTO_MODE:
-                self.set_mode(Ambulance.MANUAL_MODE)
-
-            if self.stop_count < 103:
-                self.stop()
-                self.stop_count += 1
-                if self.stop_count > 99:
-                    self.forward(0.7)
 
 
     # ===========================핸들 각도 제어(자율 주행)==========================
@@ -211,6 +203,8 @@ class Ambulance:
         return self.__mode
 
     def auto_drive(self, frame, flag):
+        # 적외선 센서 사용
+        self.cm = self.__distance.read()
         # 처음 시작할 때만 횡단보도, 차선 플래그 set
         if self.init_flag is None:
             temp_birdeye, M, Minv = line_detect.birdeye(line_detect.img_preprocessing(frame))
@@ -241,15 +235,16 @@ class Ambulance:
                     
                     # 회전할 각도의 절대량에 따라 속도를 감속
                     if angle < 10:
-                        angle = 0.55 - (angle/200)
+                        angle = self.__max_speed - (angle/200)
                     elif 10 <= angle < 20:
-                        angle = 0.53
+                        angle = self.__max_speed - 0.02
                     else:
-                        angle = 0.51
-                    
+                        angle = self.__max_speed - 0.04
 
-                    self.forward(angle)
-                    # self.pre = cm
+                    print(angle)
+                    self.set_speed(angle)
+                    self.forward()
+                    self.pre = self.cm
 
                 return 2
 
@@ -257,10 +252,11 @@ class Ambulance:
             else:
                 # 오른쪽 차선에 있을 때
                 if not self.which_side:
-                    if self.count < 15:
+                    if self.count < 14:
                         # 핸들 왼쪽으로 꺾
                         self.set_angle(18)
-                        self.forward(0.56)
+                        self.set_speed(0.56)
+                        self.forward()
                         self.count += 1
 
                     else:
@@ -271,10 +267,11 @@ class Ambulance:
 
                 # 왼쪽 차선에 있을 때
                 else:
-                    if self.count < 15:
+                    if self.count < 14:
                         # 핸들 오른쪽으로 꺾
                         self.set_angle(-18)
-                        self.forward(0.56)
+                        self.set_speed(0.56)
+                        self.forward()
                         self.count += 1
 
                     else:
@@ -282,7 +279,7 @@ class Ambulance:
                         if bool(len(self.L_lines)) != 0 or bool(len(self.R_lines)) != 0:
                             self.change_road_flag = False
                             self.count = 0
-
+                self.pre = self.cm
                 return 2
 
     # ===========================차선 상태 변경=================================
@@ -337,3 +334,17 @@ class Ambulance:
 
     def set_dst(self, dst):
         self.__dst = dst
+
+    # ==============================운송중========================================
+    def get_working(self):
+        return self.__working
+
+    def set_working(self, working):
+        self.__working = working
+
+    # ===============================속도 설정====================================
+    def set_speed(self, speed):
+        self.__dcMotor_speed = speed
+
+    def set_max_speed(self, max_speed):
+        self.__max_speed = max_speed

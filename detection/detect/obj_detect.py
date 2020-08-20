@@ -175,10 +175,21 @@ class ResultImageMqttClient:
                     pass
 
                 if cur_loc == self.ambulance.get_dst():
-                    if stop == 0:
+                    # 병원 도착
+                    if self.ambulance.get_dst() == "T":
+                        stop = 0
+                        cnt = 0
                         self.ambulance.stop()
                         self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
-                        stop = 1
+                        self.ambulance.set_working(False)
+                        self.ambulance.set_dst(None)
+
+                    else:
+                        if stop == 0:
+                            self.ambulance.stop()
+                            self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+                            stop = 1
+                            self.ambulance.set_dst("T")
 
                 elif CLASSES_DICT.get(val) == 'stop':
                     if stop == 0:
@@ -187,15 +198,20 @@ class ResultImageMqttClient:
                         stop = 1
 
                 elif CLASSES_DICT.get(val) == 'schoolzone':
-                    self.ambulance.forward(0.5)
+                    self.ambulance.set_max_speed(0.5)
+
                 elif CLASSES_DICT.get(val) == 'red' or CLASSES_DICT.get(val) == 'yellow':
                     self.ambulance.stop()
                     self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
 
                 elif CLASSES_DICT.get(val) == 'green':
                     self.ambulance.set_mode(self.ambulance.AUTO_MODE)
+
                 elif CLASSES_DICT.get(val) == '100':
-                    self.ambulance.forward(0.61)
+                    self.ambulance.set_max_speed(0.61)
+
+                elif CLASSES_DICT.get(val) == '60':
+                    self.ambulance.set_max_speed(0.5)
 
                 print("[인식객체]", cur_obj)
 
@@ -203,7 +219,8 @@ class ResultImageMqttClient:
             if stop == 1:
                 cnt += 1
             if cnt == 100:
-                self.ambulance.forward(0.62)
+                self.ambulance.set_speed(0.62)
+                self.ambulance.forward()
                 self.ambulance.set_mode(self.ambulance.AUTO_MODE)
             if cnt == 180:
                 stop = 0
@@ -226,13 +243,13 @@ class ResultImageMqttClient:
     # 메인 함수
     def main(self, camera, ambulance):
         # 엔진 파일 경로
-        enginePath = project_path + "/models/ssd_mobilenet_v2_sign9/tensorrt_fp16.engine"
+        enginePath = project_path + "/models/ssd_mobilenet_v2_sign11/tensorrt_fp16.engine"
         # 비디오 캡처 객체 얻기
         videoCapture = camera
         # 감지 결과(생산)와 처리(소비)를 동기화를 위한 Condition 얻기
         condition = threading.Condition()
         # TrtThread 객체 생성
-        self.trtThread = TrtThread(enginePath, TrtThread.INPUT_TYPE_USBCAM, videoCapture, 0.6, condition, ambulance)
+        self.trtThread = TrtThread(enginePath, TrtThread.INPUT_TYPE_USBCAM, videoCapture, 0.7, condition, ambulance)
         # 감지 시작
         self.trtThread.start()
 
