@@ -117,6 +117,9 @@ class ResultImageMqttClient:
 
         cnt = 0
         stop = 0
+
+        speed_flag = 0
+        speed_cnt = 0
         cur_obj = ""
         cur_loc = ""
 
@@ -127,6 +130,7 @@ class ResultImageMqttClient:
                 condition.wait()
                 # 감지 결과 얻기
                 img, boxes, confs, clss = trtThread.getDetectResult()
+
             # 감지된 객체 인덱스
             for val, box in zip(clss, boxes):
                 # 알파벳 인덱스 범위에 포함되면, 위치 정보 저장 및 발행
@@ -141,6 +145,7 @@ class ResultImageMqttClient:
                 else:
                     cur_obj = CLASSES_DICT.get(val)
                     self.client.publish("ambulance/1/object", CLASSES_DICT.get(val))
+                    print(cur_obj)
 
                 # 장애물(cone)
                 if val == 11:
@@ -162,17 +167,19 @@ class ResultImageMqttClient:
                                 if self.ambulance.get_mode() == Ambulance.AUTO_MODE:
                                     self.ambulance.change_road()
 
-                # 횡단보도(crosswalk) 아직 안됨
+                # 횡단보도(crosswalk)
                 if CLASSES_DICT.get(val) == "crosswalk":
-                    if stop == 0:
-                        self.ambulance.stop()
-                        self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
-                        stop = 1
-
+                    # if stop == 0:
+                    #     self.ambulance.stop()
+                    #     self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+                    #     stop = 1
+                    pass
 
                 # 방지턱(bump)
-                if val == 12:
-                    pass
+                if CLASSES_DICT.get(val) == "bump":
+                    if speed_flag == 0:
+                        self.ambulance.set_max_speed(0.5)
+                        speed_flag = 1
 
                 if cur_loc == self.ambulance.get_dst():
                     # 병원 도착
@@ -192,39 +199,63 @@ class ResultImageMqttClient:
                             self.ambulance.set_dst("T")
 
                 elif CLASSES_DICT.get(val) == 'stop':
+                    x1, y1, x2, y2 = box
+                    if (x2 - x1) > 50:
+                        if stop == 0:
+                            self.ambulance.stop()
+                            self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
+                            stop = 1
+
+                elif CLASSES_DICT.get(val) == 'schoolzone':
+                    if speed_flag == 0:
+                        self.ambulance.set_max_speed(0.5)
+                        speed_flag = 1
+
+                elif CLASSES_DICT.get(val) == 'red' or CLASSES_DICT.get(val) == 'yellow':
                     if stop == 0:
                         self.ambulance.stop()
                         self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
                         stop = 1
 
-                elif CLASSES_DICT.get(val) == 'schoolzone':
-                    self.ambulance.set_max_speed(0.5)
-
-                elif CLASSES_DICT.get(val) == 'red' or CLASSES_DICT.get(val) == 'yellow':
-                    self.ambulance.stop()
-                    self.ambulance.set_mode(self.ambulance.MANUAL_MODE)
-
                 elif CLASSES_DICT.get(val) == 'green':
                     self.ambulance.set_mode(self.ambulance.AUTO_MODE)
 
                 elif CLASSES_DICT.get(val) == '100':
-                    self.ambulance.set_max_speed(0.61)
+                    if speed_flag == 0:
+                        self.ambulance.set_max_speed(0.61)
+                        speed_flag = 1
 
                 elif CLASSES_DICT.get(val) == '60':
-                    self.ambulance.set_max_speed(0.5)
-
-                print("[인식객체]", cur_obj)
-
+                    if speed_flag == 0:
+                        self.ambulance.set_max_speed(0.5)
+                        speed_flag = 1
 
             if stop == 1:
                 cnt += 1
-            if cnt == 100:
-                self.ambulance.set_speed(0.62)
+                # 빨간불이나 노란불을 못볼 때
+            if 80 < cnt < 100 and (cur_obj == 'red' or cur_obj == 'yellow'):
+                self.ambulance.set_speed(0.5)  # 서행
+                self.ambulance.forward()
+                self.ambulance.set_mode(self.ambulance.AUTO_MODE)
+                stop = 0
+                cnt = 0
+            elif 97 < cnt < 100:
+                self.ambulance.set_speed(0.8)
                 self.ambulance.forward()
                 self.ambulance.set_mode(self.ambulance.AUTO_MODE)
             if cnt == 180:
                 stop = 0
                 cnt = 0
+
+            if speed_flag == 1:
+                speed_cnt += 1
+            if speed_cnt == 100:
+                self.ambulance.set_max_speed(0.55)
+            if speed_cnt == 150:
+                speed_flag = 0
+                speed_cnt = 0
+
+
 
             # 감지 결과 출력
             img = vis.drawBboxes(img, boxes, confs, clss)
